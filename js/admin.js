@@ -1,6 +1,7 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
-  addDoc, collection, deleteDoc, doc, getDocFromServer, onSnapshot, serverTimestamp, updateDoc,
+  addDoc, collection, deleteDoc, doc, getDocFromServer, getDocsFromServer, limit, onSnapshot,
+  query, runTransaction, serverTimestamp, updateDoc, where,
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { auth, db } from "../config/firebase-config.js";
 
@@ -13,6 +14,8 @@ const loginForm = $("login-form");
 const guestForm = $("guest-form");
 const familyForm = $("family-form");
 const deleteForm = $("delete-form");
+const familyDeleteForm = $("family-delete-form");
+const dialogs = [guestForm, familyForm, deleteForm, familyDeleteForm];
 let session;
 let authReady = false;
 
@@ -41,7 +44,7 @@ function field(form, name) {
 function clearSession(message) {
   session?.unsubscribe.forEach((stop) => stop());
   session = undefined;
-  for (const form of [guestForm, familyForm, deleteForm]) {
+  for (const form of dialogs) {
     form.closest("dialog").close();
     form.reset();
     form.querySelector(".form-message").textContent = "";
@@ -50,14 +53,14 @@ function clearSession(message) {
   }
   field(guestForm, "familiaId").replaceChildren(new Option("Sem grupo familiar", ""));
   $("delete-description").textContent = "";
-  $("guest-rows").replaceChildren();
+  $("family-delete-description").textContent = "";
+  clearTables();
   $("dashboard").hidden = true;
   $("admin-name").textContent = "";
-  $("results").textContent = "";
   $("dashboard-message").textContent = "";
+  $("family-message").textContent = "";
   $("search").value = "";
   $("status-filter").value = "";
-  $("guest-table").hidden = true;
   $("logout").disabled = false;
   document.querySelectorAll(".metrics dd").forEach((element) => { element.textContent = "—"; });
   for (const id of ["add-guest", "add-family", "export"]) $(id).disabled = true;
@@ -171,14 +174,18 @@ function ready(active) {
   return active?.authorized && active.guests !== null && active.families !== null;
 }
 
+function clearTables() {
+  for (const id of ["guest-rows", "family-rows"]) $(id).replaceChildren();
+  for (const id of ["guest-table", "family-table"]) $(id).hidden = true;
+  for (const id of ["results", "family-results"]) $(id).textContent = "";
+}
+
 function renderDashboard(active) {
   const available = Boolean(ready(active));
   for (const id of ["add-guest", "add-family", "export"]) $(id).disabled = !available;
   if (!available) {
-    for (const form of [guestForm, familyForm, deleteForm]) form.closest("dialog").close();
-    $("guest-rows").replaceChildren();
-    $("guest-table").hidden = true;
-    $("results").textContent = "";
+    for (const form of dialogs) form.closest("dialog").close();
+    clearTables();
     document.querySelectorAll(".metrics dd").forEach((element) => { element.textContent = "—"; });
     if (active.loaded) $("dashboard-message").textContent = "Aguardando conexão com o Firestore…";
     return;
@@ -202,6 +209,7 @@ function renderDashboard(active) {
   };
   for (const [id, value] of Object.entries(metrics)) $(id).textContent = value;
   renderGuests();
+  renderFamilies(active);
 }
 
 function familyName(active, guest) {
@@ -228,17 +236,7 @@ function renderGuests() {
       if (label) cell.dataset.label = label;
       cell.textContent = value;
     }
-    const actions = document.createElement("div");
-    actions.className = "actions";
-    for (const [label, action] of [["Editar", openGuest], ["Excluir", openDelete]]) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = label;
-      button.setAttribute("aria-label", `${label} ${guest.nome || "convidado"}`);
-      button.addEventListener("click", () => action(guest));
-      actions.append(button);
-    }
-    row.insertCell().append(actions);
+    addRowActions(row, guest, [["Editar", openGuest], ["Excluir", openDelete]]);
     return row;
   });
   $("guest-rows").replaceChildren(...rows);
@@ -246,6 +244,53 @@ function renderGuests() {
   $("results").textContent = guests.length
     ? `${guests.length} de ${session.guests.length} convidados`
     : "Nenhum convidado encontrado.";
+}
+
+function addRowActions(row, record, actions) {
+  const container = document.createElement("div");
+  container.className = "actions";
+  for (const [label, action] of actions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.setAttribute("aria-label", `${label} ${record.nome}`);
+    button.addEventListener("click", () => action(record));
+    container.append(button);
+  }
+  row.insertCell().append(container);
+}
+
+function renderFamilies(active) {
+  const counts = new Map();
+  for (const guest of active.guests) {
+    if (guest.familiaId) counts.set(guest.familiaId, (counts.get(guest.familiaId) ?? 0) + 1);
+  }
+  const rows = active.families.map((family) => {
+    const row = document.createElement("tr");
+    row.insertCell().textContent = family.nome;
+    const count = row.insertCell();
+    count.dataset.label = "Convidados vinculados";
+    count.textContent = counts.get(family.id) ?? 0;
+    addRowActions(row, family, [["Editar grupo", openFamily], ["Excluir grupo", openFamilyDelete]]);
+    return row;
+  });
+  $("family-rows").replaceChildren(...rows);
+  $("family-table").hidden = !rows.length;
+  $("family-results").textContent = rows.length ? "" : "Nenhum grupo familiar cadastrado.";
+  if ($("family-delete-dialog").open) updateFamilyDelete(counts);
+}
+
+function updateFamilyDelete(counts) {
+  const id = familyDeleteForm.dataset.id;
+  const family = session.families.find((item) => item.id === id);
+  if (!family) return;
+  const count = counts.get(id) ?? 0;
+  const linked = count === 1 ? "1 convidado vinculado" : `${count} convidados vinculados`;
+  $("family-delete-description").textContent = count
+    ? `O grupo “${family.nome}” tem ${linked}. Desvincule os convidados antes de excluir o grupo. Os registros deles serão preservados.`
+    : `Deseja excluir o grupo “${family.nome}”? O grupo tem 0 convidados vinculados.`;
+  $("unlink-family").hidden = count === 0;
+  $("delete-family").hidden = count > 0;
 }
 
 $("search").addEventListener("input", renderGuests);
@@ -285,12 +330,22 @@ function openDelete(guest) {
 }
 
 $("add-guest").addEventListener("click", () => openGuest());
-$("add-family").addEventListener("click", () => {
-  familyForm.reset();
-  openDialog(familyForm);
-});
+$("add-family").addEventListener("click", () => openFamily());
 
-function handleForm(form, write, successMessage) {
+function openFamily(family) {
+  familyForm.reset();
+  field(familyForm, "nome").value = family?.nome ?? "";
+  $("family-title").textContent = family ? "Editar grupo familiar" : "Novo grupo familiar";
+  $("save-family").textContent = family ? "Salvar grupo" : "Cadastrar grupo";
+  openDialog(familyForm, family?.id);
+}
+
+function openFamilyDelete(family) {
+  openDialog(familyDeleteForm, family.id);
+  renderFamilies(session);
+}
+
+function handleForm(form, write, successMessage, statusId = "dashboard-message") {
   const dialog = form.closest("dialog");
   const message = form.querySelector(".form-message");
   const buttons = [...form.querySelectorAll("button")];
@@ -306,17 +361,17 @@ function handleForm(form, write, successMessage) {
     buttons.forEach((button) => { button.disabled = true; });
     message.textContent = "Salvando no Firestore…";
     try {
-      await write(form.dataset.id);
+      const result = await write(form.dataset.id, event.submitter?.value);
       if (session !== active) return;
       dialog.close();
-      $("dashboard-message").textContent = successMessage;
+      $(statusId).textContent = result ?? successMessage;
     } catch (error) {
       if (session !== active) return;
       const detail = error.code === "permission-denied"
         ? "O Firestore negou a operação. Verifique a autorização e as regras."
-        : "Não foi possível concluir a operação. Tente novamente.";
+        : error instanceof RegistryError ? error.message : "Não foi possível concluir a operação. Tente novamente.";
       if (dialog.open) message.textContent = detail;
-      else $("dashboard-message").textContent = detail;
+      else $(statusId).textContent = detail;
     } finally {
       if (session === active) buttons.forEach((button) => { button.disabled = false; });
     }
@@ -346,15 +401,63 @@ handleForm(guestForm, (id) => {
     observacoes: values.observacoes.trim(),
     atualizadoEm: serverTimestamp(),
   };
-  return id
-    ? updateDoc(doc(db, "convidados", id), guest)
-    : addDoc(collection(db, "convidados"), { ...guest, criadoEm: serverTimestamp() });
+  const guestRef = id ? doc(db, "convidados", id) : doc(collection(db, "convidados"));
+  return runTransaction(db, async (transaction) => {
+    const previous = id ? await transaction.get(guestRef) : null;
+    if (previous && !previous.exists()) throw new RegistryError("Este convidado já foi excluído.");
+    if (guest.familiaId && previous?.data().familiaId !== guest.familiaId) {
+      const familyRef = doc(db, "familias", guest.familiaId);
+      const family = await transaction.get(familyRef);
+      if (!family.exists()) throw new RegistryError("Este grupo foi excluído. Escolha outro grupo.");
+      // Novos vínculos alteram o grupo para que uma exclusão ou desvinculação concorrente seja reavaliada.
+      transaction.update(familyRef, { vinculosAtualizadosEm: serverTimestamp() });
+    }
+    if (id) transaction.update(guestRef, guest);
+    else transaction.set(guestRef, { ...guest, criadoEm: serverTimestamp() });
+  });
 }, "Convidado salvo.");
 
-handleForm(familyForm, () => addDoc(collection(db, "familias"), {
-  nome: field(familyForm, "nome").value.trim(),
-  criadoEm: serverTimestamp(),
-}), "Grupo familiar cadastrado.");
+class RegistryError extends Error {}
+
+handleForm(familyForm, async (id) => {
+  const nome = field(familyForm, "nome").value.trim();
+  if (id) {
+    await updateDoc(doc(db, "familias", id), { nome, atualizadoEm: serverTimestamp() });
+    return "Nome do grupo familiar atualizado.";
+  }
+  await addDoc(collection(db, "familias"), { nome, criadoEm: serverTimestamp() });
+  return "Grupo familiar cadastrado.";
+}, "", "family-message");
+
+handleForm(familyDeleteForm, async (id, action) => {
+  if (action !== "delete" && action !== "unlink") return;
+  const familyRef = doc(db, "familias", id);
+  return runTransaction(db, async (transaction) => {
+    const family = await transaction.get(familyRef);
+    if (!family.exists()) throw new RegistryError("Este grupo familiar já foi excluído.");
+    const matches = query(collection(db, "convidados"), where("familiaId", "==", id),
+      limit(action === "delete" ? 1 : 500));
+    const linked = await getDocsFromServer(matches);
+
+    if (action === "delete") {
+      if (!linked.empty) throw new RegistryError("O grupo ainda tem convidados vinculados. Desvincule-os antes de excluir.");
+      transaction.delete(familyRef);
+      return "Grupo familiar excluído.";
+    }
+
+    if (linked.size >= 500) {
+      throw new RegistryError("O grupo tem 500 ou mais convidados. Desvincule alguns na edição de convidados e tente novamente.");
+    }
+    const guests = await Promise.all(linked.docs.map(({ ref }) => transaction.get(ref)));
+    const members = guests.filter((guest) => guest.data()?.familiaId === id);
+    for (const guest of members) {
+      transaction.update(guest.ref, { familiaId: null, atualizadoEm: serverTimestamp() });
+    }
+    transaction.update(familyRef, { vinculosAtualizadosEm: serverTimestamp() });
+    const count = members.length;
+    return count === 1 ? "1 convidado desvinculado." : `${count} convidados desvinculados.`;
+  });
+}, "", "family-message");
 
 handleForm(deleteForm, (id) => deleteDoc(doc(db, "convidados", id)), "Convidado excluído.");
 

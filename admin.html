@@ -45,7 +45,6 @@
         <div class="toolbar">
           <h2 id="registry-title">Convidados</h2>
           <div class="actions">
-            <button id="add-family" type="button" disabled>Novo grupo familiar</button>
             <button id="add-guest" class="primary" type="button" disabled>Novo convidado</button>
           </div>
         </div>
@@ -69,6 +68,20 @@
             <tbody id="guest-rows"></tbody>
           </table>
         </div>
+      </section>
+      <section class="panel registry" aria-labelledby="families-title">
+        <div class="toolbar">
+          <h2 id="families-title">Grupos familiares</h2>
+          <button id="add-family" type="button" disabled>Novo grupo familiar</button>
+        </div>
+        <p id="family-results"></p>
+        <div class="table-scroll">
+          <table id="family-table" hidden>
+            <thead><tr><th scope="col">Grupo</th><th scope="col">Convidados vinculados</th><th scope="col">Ações</th></tr></thead>
+            <tbody id="family-rows"></tbody>
+          </table>
+        </div>
+        <p id="family-message" role="status"></p>
       </section>
     </section>
   </main>
@@ -104,7 +117,7 @@
       <h2 id="family-title">Novo grupo familiar</h2>
       <label>Nome do grupo <input name="nome" required maxlength="160" autofocus></label>
       <p role="status" class="form-message"></p>
-      <div class="actions"><button type="button" data-close>Cancelar</button><button class="primary">Cadastrar grupo</button></div>
+      <div class="actions"><button type="button" data-close>Cancelar</button><button class="primary" id="save-family">Cadastrar grupo</button></div>
     </form>
   </dialog>
 
@@ -114,6 +127,19 @@
       <p id="delete-description"></p>
       <p role="status" class="form-message"></p>
       <div class="actions"><button type="button" data-close autofocus>Cancelar</button><button class="danger">Excluir convidado</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="family-delete-dialog" aria-labelledby="family-delete-title" aria-describedby="family-delete-description">
+    <form id="family-delete-form">
+      <h2 id="family-delete-title">Excluir grupo familiar</h2>
+      <p id="family-delete-description"></p>
+      <p role="status" class="form-message"></p>
+      <div class="actions">
+        <button type="button" data-close autofocus>Cancelar</button>
+        <button type="submit" value="unlink" id="unlink-family">Desvincular convidados</button>
+        <button type="submit" value="delete" id="delete-family" class="danger">Excluir grupo</button>
+      </div>
     </form>
   </dialog>
 

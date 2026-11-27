@@ -67,6 +67,7 @@ button:disabled { cursor: default; opacity: .55; }
 .metrics > div { padding: .8rem; }
 .metrics dt { color: var(--suave); font-size: .88rem; }
 .metrics dd { margin: .15rem 0 0; font-size: 1.55rem; font-weight: 700; }
+.registry + .registry { margin-top: 1rem; }
 .filters { justify-content: flex-start; align-items: end; margin-top: 1rem; }
 .filters label:first-child { flex: 1 1 13rem; }
 .table-scroll { overflow-x: auto; }
