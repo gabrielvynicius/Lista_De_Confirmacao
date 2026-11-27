@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function admin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/administradores/$(request.auth.uid))
+        && get(/databases/$(database)/documents/administradores/$(request.auth.uid)).data.ativo == true
+        && get(/databases/$(database)/documents/administradores/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function validCode(code) {
+      return code is string && code.matches('^[a-f0-9]{48}$');
+    }
+
+    function validAge(age) {
+      return age in ['crianca', 'adolescente', 'adulto'];
+    }
+
+    function validAnswer(status) {
+      return status in ['confirmado', 'ausente', 'indeciso'];
+    }
+
+    function settings() {
+      return get(/databases/$(database)/documents/configuracoes/casamento).data;
+    }
+
+    function newHistory(before, after) {
+      return after.historicoId is string
+        && after.historicoId.matches('^[a-f0-9-]{36}$')
+        && after.historicoId != before.get('historicoId', null)
+        && after.ultimaAlteracaoRespostaEm == request.time
+        && after.primeiraRespostaEm ==
+          (before.get('primeiraRespostaEm', null) != null ? before.primeiraRespostaEm
+            : (after.status == 'pendente' ? null : request.time));
+    }
+
+    function eventMatches(id, data, origin) {
+      let event = getAfter(/databases/$(database)/documents/convidados/$(id)/historico/$(data.historicoId)).data;
+      return event.em == request.time && event.status == data.status
+        && event.classificacao == data.classificacao && event.origem == origin
+        && event.nomeInformado == data.nomeInformado;
+    }
+
+    function sameResponse(a, b) {
+      return a.status == b.status && a.classificacao == b.classificacao
+        && a.historicoId == b.historicoId && a.nomeInformado == b.nomeInformado
+        && a.primeiraRespostaEm == b.primeiraRespostaEm
+        && a.ultimaAlteracaoRespostaEm == b.ultimaAlteracaoRespostaEm;
+    }
+
+    function authorizedPerson(code, id) {
+      let person = get(/databases/$(database)/documents/convidados/$(id)).data;
+      return validCode(code) && person.conviteCodigo == code
+        && (person.get('conviteFamiliaId', null) == null || person.conviteFamiliaId == person.familiaId);
+    }
+
+    function publicMirrorUpdate(code, id) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let rules = settings();
+      return authorizedPerson(code, id)
+        && rules.aberta == true && request.time < rules.prazo
+        && ((before.status == 'pendente' && before.primeiraRespostaEm == null) || rules.permitirAlteracoes == true)
+        && after.diff(before).affectedKeys().hasOnly([
+          'status', 'classificacao', 'nomeInformado', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm', 'historicoId'
+        ])
+        && validAnswer(after.status) && validAge(after.classificacao)
+        && after.nomeInformado is string && after.nomeInformado.size() <= 160
+        && after.nomeInformado.matches('.*[^[:space:]].*')
+        && newHistory(before, after)
+        && sameResponse(after, getAfter(/databases/$(database)/documents/convidados/$(id)).data);
+    }
+
+    function publicGuestUpdate(id) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let code = before.get('conviteCodigo', '');
+      let path = /databases/$(database)/documents/convites/$(code)/pessoas/$(id);
+      return validCode(code)
+        && after.diff(before).affectedKeys().hasOnly([
+          'status', 'classificacao', 'nomeInformado', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm', 'historicoId'
+        ])
+        && newHistory(before, after)
+        && sameResponse(after, getAfter(path).data)
+        && eventMatches(id, after, 'convidado');
+    }
+
+    function validGuestEdit(before, after) {
+      let changed = after.diff(before).affectedKeys();
+      return (!changed.hasAny(['nome']) || (after.nome is string && after.nome.size() > 0 && after.nome.size() <= 160))
+        && (!changed.hasAny(['telefone']) || (after.telefone is string && after.telefone.size() <= 40))
+        && (!changed.hasAny(['observacoes']) || (after.observacoes is string && after.observacoes.size() <= 2000))
+        && (!changed.hasAny(['familiaId']) || after.familiaId == null || after.familiaId is string)
+        && (!changed.hasAny(['classificacao']) || validAge(after.classificacao))
+        && (!changed.hasAny(['status']) || after.status == 'pendente' || validAnswer(after.status));
+    }
+
+    function adminAttendance(id, before, after) {
+      let changed = after.diff(before).affectedKeys();
+      return !changed.hasAny([
+          'status', 'classificacao', 'nomeInformado', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm', 'historicoId'
+        ])
+        || (before.get('historicoId', null) == null && before.get('status', 'pendente') == 'pendente'
+          && after.status == 'pendente'
+          && !changed.hasAny(['nomeInformado', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm', 'historicoId']))
+        || ((validAnswer(after.status) || after.status == 'pendente') && validAge(after.classificacao)
+          && newHistory(before, after) && eventMatches(id, after, 'administracao'));
+    }
+
+    match /administradores/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if admin();
+    }
+
+    match /configuracoes/casamento {
+      allow get: if true;
+      allow create, update: if admin()
+        && request.resource.data.keys().hasOnly(['prazo', 'aberta', 'permitirAlteracoes'])
+        && request.resource.data.prazo is timestamp
+        && request.resource.data.aberta is bool
+        && request.resource.data.permitirAlteracoes is bool;
+    }
+
+    match /convidados/{id} {
+      allow read, delete: if admin();
+      allow create: if admin() && request.resource.data.keys().hasAll(['nome', 'classificacao', 'status'])
+        && validGuestEdit({}, request.resource.data) && adminAttendance(id, {}, request.resource.data);
+      allow update: if (admin() && validGuestEdit(resource.data, request.resource.data)
+        && adminAttendance(id, resource.data, request.resource.data))
+        || publicGuestUpdate(id);
+
+      match /historico/{eventId} {
+        allow read: if admin();
+        allow create: if request.resource.data.keys().hasOnly(['status', 'classificacao', 'nomeInformado', 'em', 'origem'])
+          && request.resource.data.em == request.time
+          && ((request.resource.data.origem == 'administracao' && admin())
+            || (request.resource.data.origem == 'convidado' && validAnswer(request.resource.data.status)))
+          && getAfter(/databases/$(database)/documents/convidados/$(id)).data.historicoId == eventId
+          && getAfter(/databases/$(database)/documents/convidados/$(id)).data.ultimaAlteracaoRespostaEm == request.time;
+      }
+    }
+
+    match /convites/{code} {
+      allow get: if validCode(code);
+      allow list, write: if admin();
+
+      match /pessoas/{id} {
+        allow get: if admin() || authorizedPerson(code, id);
+        allow list, create, delete: if admin();
+        allow update: if admin() || publicMirrorUpdate(code, id);
+      }
+    }
+
+    match /familias/{id} {
+      allow read, write: if admin();
+    }
+
+    match /confirmacoes/{id} {
+      allow read, write: if admin();
+    }
+
+    match /presentes/{id} {
+      allow read, write: if admin();
+    }
+  }
+}

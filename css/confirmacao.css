@@ -1,0 +1,31 @@
+.rsvp { text-align: left; }
+.rsvp header { text-align: center; }
+.rsvp h1 { margin-top: .65rem; }
+.rsvp h2 { font: 600 2rem/1.1 var(--serif); margin: 0; }
+.couple-link { color: var(--accent); font-weight: 700; text-underline-offset: .25em; }
+.rsvp .deadline { padding: .65rem; border-radius: .75rem; background: var(--baby-blue); color: var(--ink); font-weight: 700; }
+.rsvp label { display: grid; gap: .3rem; font-weight: 600; }
+.rsvp input, .rsvp select {
+  inline-size: 100%;
+  min-block-size: 2.85rem;
+  padding: .5rem .65rem;
+  border: 1px solid var(--lavender);
+  border-radius: .55rem;
+  background: var(--background);
+  color: var(--ink);
+  font: inherit;
+}
+.rsvp button { cursor: pointer; font: 700 1rem var(--sans); }
+.rsvp button:disabled { cursor: default; opacity: .6; }
+.code-row { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .3rem; }
+.code-row input { flex: 1 1 13rem; }
+.rsvp fieldset, .summary { border: 1px solid var(--lavender); border-radius: .8rem; }
+.rsvp fieldset { min-inline-size: 0; margin: 1rem 0; padding: .9rem; display: grid; gap: .8rem; }
+.rsvp legend { padding-inline: .35rem; font-weight: 700; }
+.remove-person { justify-self: start; }
+.rsvp .summary { padding: .65rem 1rem .65rem 2rem; overflow-wrap: anywhere; }
+.summary li + li { margin-top: .45rem; }
+.rsvp dialog { inline-size: min(calc(100% - 2rem), 34rem); border: 1px solid var(--lavender); border-radius: 1rem; padding: 1.35rem; color: var(--ink); }
+.rsvp dialog::backdrop { background: #30253d80; }
+.rsvp [role="status"]:empty { margin: 0; }
+.rsvp [hidden] { display: none !important; }
