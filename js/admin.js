@@ -426,10 +426,7 @@ handleForm(guestForm, (id) => {
       : {};
     if (!revokeFamilyInvite && before.conviteCodigo && (attendanceChanged || guest.nome !== before.nome || guest.classificacao !== before.classificacao)) {
       // Preserve os timestamps anteriores quando a edição não muda a resposta.
-      transaction.update(personRef(before.conviteCodigo, id), {
-        ...mirrorFields({ ...before, ...guest }),
-        ...changes,
-      });
+      transaction.set(personRef(before.conviteCodigo, id), mirrorFields({ ...before, ...guest, ...changes }));
     }
     if (id) transaction.update(guestRef, { ...guest, ...changes });
     else transaction.set(guestRef, { ...guest, ...changes, criadoEm: serverTimestamp() });

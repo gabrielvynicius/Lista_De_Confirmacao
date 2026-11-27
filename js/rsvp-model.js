@@ -39,8 +39,6 @@ export function mirrorFields(guest) {
     classificacao: Object.hasOwn(ages, guest.classificacao) ? guest.classificacao : null,
     primeiraRespostaEm: guest.primeiraRespostaEm ?? null,
     ultimaAlteracaoRespostaEm: guest.ultimaAlteracaoRespostaEm ?? null,
-    historicoId: guest.historicoId ?? null,
-    nomeInformado: guest.nomeInformado ?? "",
   };
 }
 

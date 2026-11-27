@@ -234,9 +234,11 @@ $("send").addEventListener("click", async () => {
         if (!previous || normalizeName(previous.nome) !== normalizeName(response.nomeInformado)) throw new Error("stale");
         if (answered(previous) && !settings.permitirAlteracoes) throw new Error("already-answered");
         const guestRef = doc(db, "convidados", response.id);
-        const changes = recordResponse(transaction, guestRef, previous, response, "convidado");
+        const changes = recordResponse(transaction, guestRef, previous,
+          { ...response, nomeInformado: previous.nome }, "convidado");
         transaction.update(guestRef, changes);
-        transaction.update(refs[index], changes);
+        const { status, classificacao, primeiraRespostaEm, ultimaAlteracaoRespostaEm } = changes;
+        transaction.update(refs[index], { status, classificacao, primeiraRespostaEm, ultimaAlteracaoRespostaEm });
       });
     });
     if (access !== active) return;

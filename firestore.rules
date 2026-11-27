@@ -43,14 +43,28 @@ service cloud.firestore {
 
     function sameResponse(a, b) {
       return a.status == b.status && a.classificacao == b.classificacao
-        && a.historicoId == b.historicoId && a.nomeInformado == b.nomeInformado
         && a.primeiraRespostaEm == b.primeiraRespostaEm
         && a.ultimaAlteracaoRespostaEm == b.ultimaAlteracaoRespostaEm;
     }
 
+    function validInvite(data) {
+      return data.keys().hasOnly(['pessoas']) && data.pessoas is list
+        && data.pessoas.size() > 0 && data.pessoas.size() <= 100;
+    }
+
+    function validPublicPerson(data) {
+      return data.keys().hasOnly(['nome', 'status', 'classificacao', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm'])
+        && data.nome is string && data.nome.size() <= 160 && data.nome.matches('.*[^[:space:]].*')
+        && (data.status == 'pendente' || validAnswer(data.status))
+        && (data.classificacao == null || validAge(data.classificacao))
+        && (data.primeiraRespostaEm == null || data.primeiraRespostaEm is timestamp)
+        && (data.ultimaAlteracaoRespostaEm == null || data.ultimaAlteracaoRespostaEm is timestamp);
+    }
+
     function authorizedPerson(code, id) {
       let person = get(/databases/$(database)/documents/convidados/$(id)).data;
-      return validCode(code) && person.conviteCodigo == code
+      let invite = get(/databases/$(database)/documents/convites/$(code)).data;
+      return validCode(code) && person.conviteCodigo == code && validInvite(invite) && id in invite.pessoas
         && (person.get('conviteFamiliaId', null) == null || person.conviteFamiliaId == person.familiaId);
     }
 
@@ -62,12 +76,10 @@ service cloud.firestore {
         && rules.aberta == true && request.time < rules.prazo
         && ((before.status == 'pendente' && before.primeiraRespostaEm == null) || rules.permitirAlteracoes == true)
         && after.diff(before).affectedKeys().hasOnly([
-          'status', 'classificacao', 'nomeInformado', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm', 'historicoId'
+          'status', 'classificacao', 'primeiraRespostaEm', 'ultimaAlteracaoRespostaEm'
         ])
-        && validAnswer(after.status) && validAge(after.classificacao)
-        && after.nomeInformado is string && after.nomeInformado.size() <= 160
-        && after.nomeInformado.matches('.*[^[:space:]].*')
-        && newHistory(before, after)
+        && validPublicPerson(after) && validAnswer(after.status) && validAge(after.classificacao)
+        && after.ultimaAlteracaoRespostaEm == request.time
         && sameResponse(after, getAfter(/databases/$(database)/documents/convidados/$(id)).data);
     }
 
@@ -82,6 +94,9 @@ service cloud.firestore {
         ])
         && newHistory(before, after)
         && sameResponse(after, getAfter(path).data)
+        && after.nomeInformado == before.nome && after.nomeInformado == getAfter(path).data.nome
+        && after.nomeInformado is string && after.nomeInformado.size() <= 160
+        && after.nomeInformado.matches('.*[^[:space:]].*')
         && eventMatches(id, after, 'convidado');
     }
 
@@ -112,13 +127,14 @@ service cloud.firestore {
       allow list: if admin();
     }
 
+    function validSettings(data) {
+      return data.keys().hasOnly(['prazo', 'aberta', 'permitirAlteracoes'])
+        && data.prazo is timestamp && data.aberta is bool && data.permitirAlteracoes is bool;
+    }
+
     match /configuracoes/casamento {
-      allow get: if true;
-      allow create, update: if admin()
-        && request.resource.data.keys().hasOnly(['prazo', 'aberta', 'permitirAlteracoes'])
-        && request.resource.data.prazo is timestamp
-        && request.resource.data.aberta is bool
-        && request.resource.data.permitirAlteracoes is bool;
+      allow get: if admin() || resource == null || validSettings(resource.data);
+      allow create, update: if admin() && validSettings(request.resource.data);
     }
 
     match /convidados/{id} {
@@ -141,13 +157,15 @@ service cloud.firestore {
     }
 
     match /convites/{code} {
-      allow get: if validCode(code);
-      allow list, write: if admin();
+      allow get: if admin() || (validCode(code) && (resource == null || validInvite(resource.data)));
+      allow list, delete: if admin();
+      allow create, update: if admin() && validCode(code) && validInvite(request.resource.data);
 
       match /pessoas/{id} {
-        allow get: if admin() || authorizedPerson(code, id);
-        allow list, create, delete: if admin();
-        allow update: if admin() || publicMirrorUpdate(code, id);
+        allow get: if admin() || (authorizedPerson(code, id) && validPublicPerson(resource.data));
+        allow list, delete: if admin();
+        allow create: if admin() && validPublicPerson(request.resource.data);
+        allow update: if (admin() && validPublicPerson(request.resource.data)) || publicMirrorUpdate(code, id);
       }
     }
 
