@@ -35,6 +35,16 @@
 .rsvp-publico .review-check { display: flex; align-items: start; gap: .65rem; }
 .rsvp-publico .review-check input { inline-size: 1.2rem; min-block-size: 1.2rem; flex: none; }
 .rsvp-publico :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#thanks {
+  padding: clamp(1rem, 4vw, 2rem);
+  border: 1px solid var(--lavender);
+  border-radius: 1rem;
+  background: var(--background);
+  text-align: center;
+}
+#thanks-title { overflow-wrap: anywhere; scroll-margin-top: 1rem; }
+#saved-list-title { font: inherit; font-weight: 700; margin: 1.25rem 0 .5rem; }
+#thanks .summary { margin: 0; text-align: left; background: var(--paper); }
 @media (max-width: 30rem) {
   .rsvp-publico .portal-actions > * { inline-size: 100%; text-align: center; }
 }

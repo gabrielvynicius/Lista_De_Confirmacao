@@ -93,6 +93,7 @@ function showForm() {
 function showSaved() {
   form.hidden = true;
   $("thanks").hidden = true;
+  $("portal-nav").hidden = false;
   $("existing").hidden = saved.length === 0;
   fillSummary($("existing-list"), saved);
   const mayEdit = saved.length && settings?.editing;
@@ -128,7 +129,7 @@ async function load() {
     uid = identity;
     settings = configuration;
     $("deadline").textContent = settings?.deadline
-      ? `Prazo de confirmação: ${deadlineFormat.format(settings.deadline)} (horário de Brasília)`
+      ? `Prazo de ${isDemo ? "demonstração" : "confirmação"}: ${deadlineFormat.format(settings.deadline)} (horário de Brasília)`
       : "Prazo de confirmação indisponível.";
     saved = (await readResponses(uid)).sort((a, b) => Number(a.slot) - Number(b.slot));
     rememberSlots([]);
@@ -259,14 +260,19 @@ $("send").addEventListener("click", async () => {
     sessionStorage.removeItem(journalKey());
     journal = draft = undefined;
     review.close();
-    form.hidden = $("existing").hidden = true;
-    $("thanks").hidden = false;
-    $("thanks-title").textContent = isDemo ? "Dados de demonstração salvos" : `Obrigado pela resposta, ${items[0].nome}!`;
+    form.hidden = $("existing").hidden = $("portal-nav").hidden = true;
+    const heading = $("thanks-title");
+    heading.textContent = `Agradecemos sua resposta, ${items[0].nome}!`;
+    $("thanks-intro").textContent = isDemo
+      ? "Os dados de teste foram salvos neste navegador."
+      : "Foi um carinho receber sua resposta. Confira abaixo o que ficou registrado.";
     fillSummary($("saved-list"), items);
+    $("thanks").hidden = false;
     $("reminder").hidden = isDemo || !settings?.editing || !items.some(({ status }) => status === "indeciso");
     $("reminder").textContent = "Você pode atualizar uma resposta indecisa neste navegador até o prazo.";
     $("message").textContent = "";
-    $("thanks-title").focus();
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ block: "start" });
   } catch (error) {
     const verified = journal ? `${journal.done} de ${journal.items.length} respostas verificadas. ` : "";
     const next = !journal
