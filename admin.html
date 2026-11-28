@@ -35,9 +35,11 @@
         <div><dt>Convidados</dt><dd id="total">—</dd></div>
         <div><dt>Confirmados</dt><dd id="confirmed">—</dd></div>
         <div><dt>Ausentes</dt><dd id="absent">—</dd></div>
-        <div><dt>Pendentes</dt><dd id="pending">—</dd></div>
+        <div><dt>Sem resposta</dt><dd id="pending">—</dd></div>
+        <div><dt>Indecisos</dt><dd id="undecided">—</dd></div>
         <div><dt>Adultos</dt><dd id="adults">—</dd></div>
-        <div><dt>Crianças</dt><dd id="children">—</dd></div>
+        <div><dt>Crianças até 7 anos</dt><dd id="children">—</dd></div>
+        <div><dt>De 8 a 17 anos</dt><dd id="teenagers">—</dd></div>
         <div><dt>Confirmação</dt><dd id="percentage">—</dd></div>
       </dl>
 
@@ -53,9 +55,10 @@
           <label>Status
             <select id="status-filter">
               <option value="">Todos</option>
-              <option value="pendente">Pendente</option>
+              <option value="pendente">Sem resposta</option>
               <option value="confirmado">Confirmado</option>
               <option value="ausente">Ausente</option>
+            <option value="indeciso">Indeciso</option>
             </select>
           </label>
           <button id="export" type="button" disabled>Exportar CSV</button>
@@ -64,7 +67,7 @@
         <p id="results"></p>
         <div class="table-scroll">
           <table id="guest-table" hidden>
-            <thead><tr><th scope="col">Nome</th><th scope="col">Classificação</th><th scope="col">Família</th><th scope="col">Status</th><th scope="col">Ações</th></tr></thead>
+            <thead><tr><th scope="col">Nome</th><th scope="col">Classificação</th><th scope="col">Família</th><th scope="col">Status</th><th scope="col">Primeira resposta</th><th scope="col">Última alteração</th><th scope="col">Ações</th></tr></thead>
             <tbody id="guest-rows"></tbody>
           </table>
         </div>
@@ -83,6 +86,23 @@
         </div>
         <p id="family-message" role="status"></p>
       </section>
+      <section class="panel registry" aria-labelledby="settings-title">
+        <h2 id="settings-title">Configurações do casamento</h2>
+        <form id="settings-form">
+          <label>Prazo de confirmação (horário de Brasília)
+            <input id="settings-deadline" type="datetime-local" required>
+          </label>
+          <label>Confirmações públicas
+            <select id="settings-open">
+              <option value="true">Abertas até o prazo</option>
+              <option value="false">Encerradas antecipadamente</option>
+            </select>
+          </label>
+          <label class="checkbox"><input id="settings-changes" type="checkbox" checked> Permitir alterações de respostas</label>
+          <div class="actions"><button class="primary" id="settings-save" disabled>Salvar configurações</button></div>
+        </form>
+        <p id="settings-message" role="status"></p>
+      </section>
     </section>
   </main>
 
@@ -90,20 +110,21 @@
     <form id="guest-form">
       <h2 id="guest-title">Novo convidado</h2>
       <label>Nome completo <input name="nome" required maxlength="160" autofocus></label>
-      <label>Classificação
+      <label>Faixa etária
         <select name="classificacao" required>
-          <option value="adulto">Adulto</option>
-          <option value="adolescente">Adolescente</option>
-          <option value="crianca">Criança</option>
+          <option value="adulto">18 anos ou mais</option>
+          <option value="adolescente">De 8 a 17 anos</option>
+          <option value="crianca">Criança de até 7 anos</option>
         </select>
       </label>
       <label>Grupo familiar <select name="familiaId"><option value="">Sem grupo familiar</option></select></label>
       <label>Telefone <input name="telefone" type="tel" maxlength="40" autocomplete="off"></label>
       <label>Status
         <select name="status" required>
-          <option value="pendente">Pendente</option>
+          <option value="pendente">Sem resposta</option>
           <option value="confirmado">Confirmado</option>
           <option value="ausente">Ausente</option>
+            <option value="indeciso">Indeciso</option>
         </select>
       </label>
       <label>Observações <textarea name="observacoes" rows="3" maxlength="2000"></textarea></label>
@@ -141,6 +162,21 @@
         <button type="submit" value="delete" id="delete-family" class="danger">Excluir grupo</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="invite-dialog" aria-labelledby="invite-title">
+    <h2 id="invite-title">Link de confirmação</h2>
+    <p id="invite-people"></p>
+    <p>Gerar um novo link substitui o acesso anterior das pessoas acima e preserva as respostas registradas.</p>
+    <div id="invite-result" hidden>
+      <label>Link privado <input id="invite-link" readonly></label>
+      <button id="copy-invite" type="button">Copiar link</button>
+    </div>
+    <p id="invite-message" role="status"></p>
+    <div class="actions">
+      <button id="invite-close" type="button">Fechar</button>
+      <button class="primary" id="create-invite" type="button">Gerar link</button>
+    </div>
   </dialog>
 
   <script type="module">

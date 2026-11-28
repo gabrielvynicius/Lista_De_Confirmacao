@@ -5,9 +5,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { auth, db } from "../config/firebase-config.js";
 
+import { loadRsvpAdmin, openInviteAdmin, resetRsvpAdmin } from "./admin-rsvp.js";
+import { ages, formatDate, mirrorFields, normalizeName, personRef, recordResponse, statuses, statusOf } from "./rsvp-model.js";
+
 const $ = (id) => document.getElementById(id);
-const statuses = { pendente: "Pendente", confirmado: "Confirmado", ausente: "Ausente" };
-const classifications = { adulto: "Adulto", adolescente: "Adolescente", crianca: "Criança" };
 const nameOrder = new Intl.Collator("pt-BR", { sensitivity: "base" });
 const percent = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
 const loginForm = $("login-form");
@@ -19,16 +20,8 @@ const dialogs = [guestForm, familyForm, deleteForm, familyDeleteForm];
 let session;
 let authReady = false;
 
-function statusOf(guest) {
-  return Object.hasOwn(statuses, guest.status) ? guest.status : "pendente";
-}
-
 function classificationOf(guest) {
-  return Object.hasOwn(classifications, guest.classificacao) ? classifications[guest.classificacao] : "";
-}
-
-function normalize(text) {
-  return text.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
+  return Object.hasOwn(ages, guest.classificacao) ? ages[guest.classificacao] : "";
 }
 
 function records(snapshot) {
@@ -44,6 +37,7 @@ function field(form, name) {
 function clearSession(message) {
   session?.unsubscribe.forEach((stop) => stop());
   session = undefined;
+  resetRsvpAdmin();
   for (const form of dialogs) {
     form.closest("dialog").close();
     form.reset();
@@ -99,6 +93,7 @@ async function openSession(user) {
     $("admin-name").textContent = administrator.data().nome || "Administração do casamento";
     $("login").hidden = true;
     $("dashboard").hidden = false;
+    void loadRsvpAdmin();
     $("dashboard-title").focus();
     $("dashboard-message").textContent = "Carregando convidados e famílias…";
 
@@ -202,7 +197,9 @@ function renderDashboard(active) {
     total: guests.length,
     confirmed,
     absent,
-    pending: guests.length - confirmed - absent,
+    pending: guests.filter((guest) => statusOf(guest) === "pendente").length,
+    undecided: guests.filter((guest) => statusOf(guest) === "indeciso").length,
+    teenagers: guests.filter((guest) => guest.classificacao === "adolescente").length,
     adults: guests.filter((guest) => guest.classificacao === "adulto").length,
     children: guests.filter((guest) => guest.classificacao === "crianca").length,
     percentage: percent.format(guests.length ? confirmed / guests.length : 0),
@@ -219,10 +216,10 @@ function familyName(active, guest) {
 
 function renderGuests() {
   if (!ready(session)) return;
-  const query = normalize($("search").value.trim());
+  const query = normalizeName($("search").value.trim());
   const status = $("status-filter").value;
   const guests = session.guests.filter((guest) =>
-    normalize(String(guest.nome ?? "")).includes(query) && (!status || statusOf(guest) === status));
+    normalizeName(String(guest.nome ?? "")).includes(query) && (!status || statusOf(guest) === status));
   const rows = guests.map((guest) => {
     const row = document.createElement("tr");
     const cells = [
@@ -230,13 +227,16 @@ function renderGuests() {
       ["Classificação", classificationOf(guest) || "—"],
       ["Família", familyName(session, guest)],
       ["Status", statuses[statusOf(guest)]],
+      ["Primeira resposta", formatDate(guest.primeiraRespostaEm) || "—"],
+      ["Última alteração", formatDate(guest.ultimaAlteracaoRespostaEm) || "—"],
     ];
     for (const [label, value] of cells) {
       const cell = row.insertCell();
       if (label) cell.dataset.label = label;
       cell.textContent = value;
     }
-    addRowActions(row, guest, [["Editar", openGuest], ["Excluir", openDelete]]);
+    addRowActions(row, guest, [["Editar", openGuest], ["Excluir", openDelete],
+      ["Convite de", (person) => openInviteAdmin([person])]]);
     return row;
   });
   $("guest-rows").replaceChildren(...rows);
@@ -271,7 +271,8 @@ function renderFamilies(active) {
     const count = row.insertCell();
     count.dataset.label = "Convidados vinculados";
     count.textContent = counts.get(family.id) ?? 0;
-    addRowActions(row, family, [["Editar grupo", openFamily], ["Excluir grupo", openFamilyDelete]]);
+    addRowActions(row, family, [["Editar grupo", openFamily], ["Excluir grupo", openFamilyDelete],
+      ["Convite de", (group) => openInviteAdmin(active.guests.filter((guest) => guest.familiaId === group.id), group.id)]]);
     return row;
   });
   $("family-rows").replaceChildren(...rows);
@@ -412,8 +413,23 @@ handleForm(guestForm, (id) => {
       // Novos vínculos alteram o grupo para que uma exclusão ou desvinculação concorrente seja reavaliada.
       transaction.update(familyRef, { vinculosAtualizadosEm: serverTimestamp() });
     }
-    if (id) transaction.update(guestRef, guest);
-    else transaction.set(guestRef, { ...guest, criadoEm: serverTimestamp() });
+    const before = previous?.data() ?? {};
+    const revokeFamilyInvite = before.conviteFamiliaId && before.familiaId !== guest.familiaId;
+    if (revokeFamilyInvite) {
+      guest.conviteCodigo = null;
+      guest.conviteFamiliaId = null;
+    }
+    const attendanceChanged = statusOf(before) !== guest.status
+      || (guest.classificacao !== before.classificacao && (guest.status !== "pendente" || before.historicoId));
+    const changes = attendanceChanged
+      ? recordResponse(transaction, guestRef, before, { ...guest, nomeInformado: before.nomeInformado ?? "" }, "administracao")
+      : {};
+    if (!revokeFamilyInvite && before.conviteCodigo && (attendanceChanged || guest.nome !== before.nome || guest.classificacao !== before.classificacao)) {
+      // Preserve os timestamps anteriores quando a edição não muda a resposta.
+      transaction.set(personRef(before.conviteCodigo, id), mirrorFields({ ...before, ...guest, ...changes }));
+    }
+    if (id) transaction.update(guestRef, { ...guest, ...changes });
+    else transaction.set(guestRef, { ...guest, ...changes, criadoEm: serverTimestamp() });
   });
 }, "Convidado salvo.");
 
@@ -451,7 +467,12 @@ handleForm(familyDeleteForm, async (id, action) => {
     const guests = await Promise.all(linked.docs.map(({ ref }) => transaction.get(ref)));
     const members = guests.filter((guest) => guest.data()?.familiaId === id);
     for (const guest of members) {
-      transaction.update(guest.ref, { familiaId: null, atualizadoEm: serverTimestamp() });
+      const change = { familiaId: null, atualizadoEm: serverTimestamp() };
+      if (guest.data().conviteFamiliaId) {
+        change.conviteCodigo = null;
+        change.conviteFamiliaId = null;
+      }
+      transaction.update(guest.ref, change);
     }
     transaction.update(familyRef, { vinculosAtualizadosEm: serverTimestamp() });
     const count = members.length;
@@ -472,10 +493,11 @@ function csvCell(value, preserveText = false) {
 $("export").addEventListener("click", () => {
   const active = session;
   if (!ready(active)) return;
-  const header = ["Nome completo", "Classificação", "Grupo familiar", "Telefone", "Status", "Observações"];
+  const header = ["Nome completo", "Faixa etária", "Grupo familiar", "Telefone", "Status", "Observações", "Primeira resposta (Brasília)", "Última alteração (Brasília)"];
   const rows = active.guests.map((guest) => [
     guest.nome, classificationOf(guest), familyName(active, guest),
     guest.telefone, statuses[statusOf(guest)], guest.observacoes,
+    formatDate(guest.primeiraRespostaEm), formatDate(guest.ultimaAlteracaoRespostaEm),
   ].map((value, index) => csvCell(value, index === 3)).join(";"));
   const csv = ["\ufeff" + header.map((value) => csvCell(value)).join(";"), ...rows].join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
