@@ -1,6 +1,8 @@
 import { doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { db } from "../config/firebase-config.js";
 
+export { normalizeName } from "./names.js";
+
 export const statuses = { pendente: "Sem resposta", confirmado: "Confirmado", ausente: "Ausente", indeciso: "Indeciso" };
 export const ages = { crianca: "Criança de até 7 anos", adolescente: "De 8 a 17 anos", adulto: "18 anos ou mais" };
 export const answers = {
@@ -18,10 +20,6 @@ const formatter = new Intl.DateTimeFormat("pt-BR", {
 
 export function formatDate(timestamp) {
   return timestamp?.toDate ? formatter.format(timestamp.toDate()) : "";
-}
-
-export function normalizeName(value) {
-  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR").trim().replace(/\s+/gu, " ");
 }
 
 export function statusOf(guest) {
