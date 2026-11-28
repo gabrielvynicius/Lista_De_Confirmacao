@@ -46,7 +46,7 @@ input, select, textarea {
   font-weight: 400;
 }
 textarea { resize: vertical; }
-button {
+button, .button-link {
   min-height: 2.8rem;
   padding: .45rem .9rem;
   border: 1px solid var(--lavanda);
@@ -90,5 +90,8 @@ dialog::backdrop { background: #24183180; }
 #settings-form { margin-top: 1rem; max-width: 30rem; }
 .checkbox { display: flex; align-items: center; gap: .5rem; }
 .checkbox input { width: 1.2rem; min-height: 1.2rem; accent-color: var(--acento); }
-#invite-result button { margin-top: .5rem; }
+#invite-result label + label, #invite-result .actions { margin-top: .65rem; }
+#invite-message { overflow-wrap: anywhere; }
+.button-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
+.button-link:hover { background: var(--azul); }
 td .actions { flex-wrap: wrap; }
