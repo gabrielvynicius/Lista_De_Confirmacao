@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Confirmação de presença — Ana Claudia &amp; Gabriel</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/confirmacao.css">
+</head>
+<body>
+  <main class="confirmation rsvp">
+    <header>
+      <a class="couple-link" href="index.html">Ana Claudia &amp; Gabriel</a>
+      <h1>Confirmação de presença</h1>
+      <p class="deadline" id="deadline">Consultando o prazo de confirmação…</p>
+    </header>
+    <form id="invite-form">
+      <label for="invite-code">Código do convite</label>
+      <div class="code-row">
+        <input id="invite-code" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="48" required>
+        <button class="portal-link portal-link-primary" id="open-invite" disabled>Abrir convite</button>
+      </div>
+    </form>
+    <p id="message" role="status"></p>
+    <section id="attendance" hidden>
+      <p id="invite-note"></p>
+      <ul id="existing" class="summary" hidden></ul>
+      <form id="response-form" hidden>
+        <div id="people"></div>
+        <div class="portal-actions">
+          <button class="portal-link" id="add-person" type="button">Adicionar outro convidado</button>
+          <button class="portal-link portal-link-primary" type="submit">Revisar respostas</button>
+        </div>
+      </form>
+    </section>
+    <dialog id="review" aria-labelledby="review-title">
+      <h2 id="review-title">Revise suas respostas</h2>
+      <ul id="review-list" class="summary"></ul>
+      <p id="review-message" role="status"></p>
+      <div class="portal-actions">
+        <button class="portal-link" id="back" type="button">Voltar e editar</button>
+        <button class="portal-link portal-link-primary" id="send" type="button">Enviar respostas</button>
+      </div>
+    </dialog>
+    <section id="thanks" hidden aria-labelledby="thanks-title">
+      <h2 id="thanks-title" tabindex="-1"></h2>
+      <ul id="saved-list" class="summary"></ul>
+      <p id="reminder" hidden></p>
+      <nav class="portal-actions" aria-label="Próximos passos">
+        <a class="portal-link portal-link-primary" href="presentes.html">Presentear o casal</a>
+        <a class="portal-link" href="index.html">Finalizar</a>
+      </nav>
+    </section>
+    <nav id="portal-nav" class="portal-actions" aria-label="Outras opções">
+      <a class="portal-link" href="index.html">Voltar ao início</a>
+      <a class="portal-link" href="presentes.html">Presentear o casal</a>
+    </nav>
+  </main>
+  <script type="module">
+    import("./js/confirmacao.js").catch(() => {
+      document.querySelector("#deadline").textContent = "Não foi possível consultar o prazo de confirmação.";
+      document.querySelector("#message").textContent = "Verifique a conexão e recarregue a página.";
+    });
+  </script>
+</body>
+</html>

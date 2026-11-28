@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/fireba
 import { initializeAuth, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyA6-iuYJIMfPYykCps797wKgpr6w7Z2NHA",
   authDomain: "casamento-ana-gabriel-2d0a5.firebaseapp.com",
   projectId: "casamento-ana-gabriel-2d0a5",
