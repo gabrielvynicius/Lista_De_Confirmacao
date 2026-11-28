@@ -169,6 +169,122 @@ service cloud.firestore {
       }
     }
 
+    function anonymousOwner(uid) {
+      return request.auth != null && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function publicRsvpOpen(editing) {
+      let activation = get(/databases/$(database)/documents/configuracoes/rsvpPublico).data;
+      let wedding = get(/databases/$(database)/documents/configuracoes/casamento).data;
+      return activation.ativa == true
+        && wedding.aberta == true && wedding.prazo is timestamp && request.time < wedding.prazo
+        && (!editing || wedding.permitirAlteracoes == true);
+    }
+
+    function validRsvpSlot(slot) {
+      return slot.matches('^([1-9]|1[0-2])$');
+    }
+
+    function validRsvpName(name) {
+      return name is string && name.size() <= 160
+        && name.matches("^\\p{L}[\\p{L}\\p{M}]*(?:[ '’‐‑-]\\p{L}[\\p{L}\\p{M}]*)*$")
+        && !name.matches('.*[\\x{180B}-\\x{180D}\\x{180F}\\x{20E3}\\x{2139}\\x{FE00}-\\x{FE0F}\\x{E0100}-\\x{E01EF}].*');
+    }
+
+    function validRsvpResponse(data) {
+      return data.keys().hasAll([
+          'nome', 'classificacao', 'status', 'versao', 'eventoId', 'criadoEm', 'atualizadoEm'
+        ])
+        && data.keys().hasOnly([
+          'nome', 'classificacao', 'status', 'versao', 'eventoId', 'criadoEm', 'atualizadoEm'
+        ])
+        && validRsvpName(data.nome) && validAge(data.classificacao) && validAnswer(data.status)
+        && data.versao is int && data.eventoId is string
+        && data.criadoEm is timestamp && data.atualizadoEm == request.time;
+    }
+
+    function rsvpHistoryPath(uid, slot, eventId) {
+      return /databases/$(database)/documents/rsvpEnvios/$(uid)/rsvpPessoas/$(slot)/historico/$(eventId);
+    }
+
+    function rsvpState(data) {
+      return { 'nome': data.nome, 'classificacao': data.classificacao, 'status': data.status, 'versao': data.versao };
+    }
+
+    function rsvpEventMatches(uid, slot, eventId, data, kind, origin) {
+      let event = getAfter(rsvpHistoryPath(uid, slot, eventId)).data;
+      return event.tipo == kind && event.origem == origin && event.em == request.time
+        && event.estado == rsvpState(data);
+    }
+
+    function rsvpResponsePath(uid, slot) {
+      return /databases/$(database)/documents/rsvpEnvios/$(uid)/rsvpPessoas/$(slot);
+    }
+
+    function validRsvpEventWrite(uid, slot, eventId) {
+      let path = rsvpResponsePath(uid, slot);
+      let event = request.resource.data;
+      return event.keys().hasOnly(['tipo', 'origem', 'em', 'estado'])
+        && event.em == request.time
+        && (
+          (eventId == 'exclusao' && admin() && event.tipo == 'exclusao'
+            && event.origem == 'administracao' && !existsAfter(path)
+            && event.estado == rsvpState(get(path).data))
+          || (eventId != 'exclusao'
+            && ((event.origem == 'administracao' && admin())
+              || (event.origem == 'convidado' && anonymousOwner(uid)))
+            && getAfter(path).data.eventoId == eventId
+            && getAfter(path).data.atualizadoEm == request.time)
+        );
+    }
+
+    match /configuracoes/rsvpPublico {
+      allow get: if admin() || resource == null
+        || (resource.data.keys().hasOnly(['ativa']) && resource.data.ativa is bool);
+      allow create, update: if admin() && request.resource.data.keys().hasOnly(['ativa'])
+        && request.resource.data.ativa is bool;
+    }
+
+    // O UID é parte do caminho e não é controlado pelos campos do documento.
+    match /rsvpEnvios/{uid}/rsvpPessoas/{slot} {
+      allow get, list: if admin() || anonymousOwner(uid);
+
+      allow create: if validRsvpSlot(slot) && anonymousOwner(uid) && publicRsvpOpen(false)
+        && validRsvpResponse(request.resource.data)
+        && request.resource.data.versao == 1 && request.resource.data.eventoId == 'inicio'
+        && request.resource.data.criadoEm == request.time
+        && !exists(rsvpHistoryPath(uid, slot, 'inicio'))
+        && rsvpEventMatches(uid, slot, 'inicio', request.resource.data, 'criacao', 'convidado');
+
+      allow update: if validRsvpSlot(slot) && validRsvpResponse(request.resource.data)
+        && request.resource.data.eventoId.matches('^[a-f0-9-]{36}$')
+        && request.resource.data.eventoId != resource.data.eventoId
+        && request.resource.data.versao == resource.data.versao + 1
+        && request.resource.data.criadoEm == resource.data.criadoEm
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny(['nome', 'classificacao', 'status'])
+        && (
+          (admin() && rsvpEventMatches(uid, slot, request.resource.data.eventoId,
+            request.resource.data, 'alteracao', 'administracao'))
+          || (anonymousOwner(uid) && publicRsvpOpen(true)
+            && rsvpEventMatches(uid, slot, request.resource.data.eventoId,
+              request.resource.data, 'alteracao', 'convidado'))
+        );
+
+      allow delete: if admin()
+        && rsvpEventMatches(uid, slot, 'exclusao', resource.data, 'exclusao', 'administracao');
+
+      match /historico/{eventId} {
+        allow read: if admin();
+        allow create: if validRsvpSlot(slot) && validRsvpEventWrite(uid, slot, eventId);
+      }
+    }
+
+    // Nome de coleção reservado para a listagem administrativa entre envios.
+    match /{path=**}/rsvpPessoas/{slot} {
+      allow list: if admin();
+    }
+
     match /familias/{id} {
       allow read, write: if admin();
     }
