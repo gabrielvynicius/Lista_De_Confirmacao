@@ -6,7 +6,8 @@ import {
 import { auth, db } from "../config/firebase-config.js";
 
 import { loadRsvpAdmin, openInviteAdmin, resetRsvpAdmin } from "./admin-rsvp.js";
-import { ages, formatDate, mirrorFields, normalizeName, personRef, recordResponse, statuses, statusOf } from "./rsvp-model.js";
+import { formatGuestName, normalizeName } from "./names.js";
+import { ages, formatDate, mirrorFields, personRef, recordResponse, statuses, statusOf } from "./rsvp-model.js";
 
 const $ = (id) => document.getElementById(id);
 const nameOrder = new Intl.Collator("pt-BR", { sensitivity: "base" });
@@ -393,8 +394,14 @@ for (const form of [guestForm, familyForm]) {
 
 handleForm(guestForm, (id) => {
   const values = Object.fromEntries(new FormData(guestForm));
+  let nome;
+  try {
+    nome = formatGuestName(values.nome);
+  } catch (error) {
+    throw new RegistryError(error.message);
+  }
   const guest = {
-    nome: values.nome.trim(),
+    nome,
     classificacao: values.classificacao,
     familiaId: values.familiaId || null,
     telefone: values.telefone.trim(),

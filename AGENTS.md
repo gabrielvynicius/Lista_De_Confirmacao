@@ -58,17 +58,21 @@ A página de presentes também deverá disponibilizar acesso à confirmação de
 
 ## Confirmação de presença
 
-Funcionalidades planejadas:
+O fluxo aprovado deve coletar os nomes dos convidados por um link público único. O primeiro acesso não exige cadastro prévio, código de convite ou criação manual de conta.
 
-- Identificação segura do convidado.
-- Confirmação individual.
-- Confirmação familiar.
-- Registro de presença ou ausência.
-- Consulta de confirmação existente.
-- Alteração de resposta.
-- Prevenção de duplicidades.
-- Controle de acompanhantes autorizados.
-- Mensagem de agradecimento.
+- Permitir que uma pessoa registre nome completo, faixa etária e status de presença para si e para familiares, com revisão antes do envio.
+- Exibir os registros automaticamente no painel administrativo, sem aprovação manual. Preservar os grupos familiares existentes e permitir a associação pelo painel.
+- Usar autenticação anônima do Firebase para vincular o envio à sessão. Permitir alterações pelo próprio autor segundo o prazo e as permissões configuradas. Tratar a perda de acesso com os noivos, sem recuperação por nome.
+- Separar respostas públicas de dados administrativos privados. Restringir o acesso ao próprio envio, manter o histórico protegido e usar medidas de prevenção de spam compatíveis com o plano Spark.
+- Preservar o prazo de confirmação, o encerramento antecipado, a configuração de alterações, o histórico e a lista de presentes.
+
+### Nomes de convidados
+
+- Compartilhar a função de tratamento entre o painel administrativo e o futuro formulário público.
+- Gravar nomes em maiúsculas, preservando acentos, hífens e apóstrofos. Remover espaços nas extremidades e reduzir espaços excedentes entre partes do nome.
+- Rejeitar números e emojis. Preservar a grafia informada, inclusive nomes de uma só palavra.
+- Normalizar capitalização, acentos e espaços apenas na chave de comparação. Usar IDs distintos para identificar pessoas. Nomes iguais ou semelhantes são apenas indícios de duplicidade e não devem bloquear o envio nem mesclar homônimos automaticamente.
+- Aplicar a padronização ao cadastrar ou salvar uma edição. Preservar a grafia dos registros existentes até que sejam editados, sem migração automática.
 
 ## Painel administrativo
 
@@ -115,16 +119,12 @@ Utilizar preferencialmente Firebase Authentication e Cloud Firestore, após apro
 
 ## Prioridade atual
 
-O site está apresentando uma tela branca após o envio de arquivos possivelmente vazios.
+Implementar o novo fluxo de confirmação em etapas pequenas e independentes, partindo da branch `main`.
 
-As próximas tarefas deverão ser:
+1. Padronizar e validar nomes no cadastro e na edição administrativa.
+2. Definir o modelo de dados público, a autoria, o histórico e as regras do Firestore.
+3. Criar o formulário público com autenticação anônima e revisão do envio.
+4. Integrar os registros ao painel e sinalizar possíveis duplicidades.
+5. Validar alterações de respostas, proteção contra spam e a sequência de implantação.
 
-1. Analisar a estrutura atual e o histórico de commits.
-2. Recuperar o código original da página de presentes.
-3. Preservar as funcionalidades existentes.
-4. Criar a nova página inicial.
-5. Integrar a navegação.
-6. Desenvolver a confirmação de presença.
-7. Configurar o Firebase.
-8. Desenvolver o painel administrativo.
-9. Realizar testes e publicar.
+O PR #4, dedicado ao gerenciamento de códigos de convite, deve permanecer sem merge enquanto o fluxo por link único é desenvolvido.
