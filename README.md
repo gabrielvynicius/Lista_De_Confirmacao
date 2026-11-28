@@ -42,3 +42,7 @@ Os registros existentes continuam usando os códigos de faixa `crianca`, `adoles
 Cada evento em `convidados/{id}/historico/{evento}` grava a faixa, o status, a origem e o horário do servidor. As regras permitem acrescentar um evento coerente com a alteração, mas impedem que clientes editem ou apaguem eventos existentes. Os dados de convidados e os códigos não devem ser versionados.
 
 O fluxo utiliza apenas Firestore e o login administrativo já existente, dentro dos limites de uso do plano Spark. Não requer Cloud Functions, servidor próprio ou uma conta Firebase para cada convidado.
+
+## RSVP por link público
+
+O [contrato da Etapa 2](docs/rsvp-publico.md) descreve o modelo por UID anônimo, as regras, os testes locais e a configuração manual futura. Esta etapa prepara os dados e a segurança. A interface publicada continua usando o fluxo existente.
