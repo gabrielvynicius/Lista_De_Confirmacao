@@ -42,3 +42,11 @@ node --test tests/rsvp-rules.test.mjs
 ```
 
 O teste usa apenas loopback e limpa o projeto emulado `demo-rsvp-publico` antes da execução. Use `FIRESTORE_EMULATOR_PORT` para outra porta. As credenciais do teste simulam as identidades aceitas pelo emulador. Nenhum dado ou credencial de produção é usado.
+
+## Formulário da Etapa 3
+
+O acesso normal é `confirmacao.html`, sem código. O formulário usa uma instância Firebase separada do login do painel e cria uma sessão anônima automaticamente, persistida pelo Firebase no navegador. Links antigos com `#convite=...` continuam seguindo para a página de convites anterior. O painel e a coleção de convidados existentes continuam independentes do novo fluxo. A unificação das listas será feita na etapa seguinte.
+
+O navegador registra os slots usados e mantém, na aba, apenas o rascunho de um envio já iniciado. Em caso de falha, retomar o envio reutiliza os mesmos slots, versões e IDs de eventos, inclusive depois de recarregar a aba. Se o servidor já gravou um lote e a confirmação de rede se perdeu, a retomada verifica os registros existentes antes de passar ao lote seguinte. O rascunho é removido na conclusão ou quando a pessoa decide consultar o que ficou salvo e encerrar a tentativa. A sessão anônima é necessária para consultar ou editar, mesmo que se saiba o nome usado no envio.
+
+A prévia privada é uma demonstração separada, com prazo fictício e gravação local no navegador para avaliar a interface. O frontend do PR usa o Firebase. Os testes de integração devem apontar para instâncias emuladas de Authentication e Firestore com um projeto de demonstração e as regras da Etapa 2.

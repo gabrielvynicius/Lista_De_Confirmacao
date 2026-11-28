@@ -29,3 +29,12 @@
 .rsvp dialog::backdrop { background: #30253d80; }
 .rsvp [role="status"]:empty { margin: 0; }
 .rsvp [hidden] { display: none !important; }
+
+.rsvp-publico #existing, .rsvp-publico #thanks, .rsvp-publico form { margin-block: 1.5rem; }
+.rsvp-publico .preview-note { padding: .75rem; border: 1px dashed var(--lavender); border-radius: .6rem; }
+.rsvp-publico .review-check { display: flex; align-items: start; gap: .65rem; }
+.rsvp-publico .review-check input { inline-size: 1.2rem; min-block-size: 1.2rem; flex: none; }
+.rsvp-publico :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 30rem) {
+  .rsvp-publico .portal-actions > * { inline-size: 100%; text-align: center; }
+}
