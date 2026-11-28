@@ -236,7 +236,7 @@ function renderGuests() {
       cell.textContent = value;
     }
     addRowActions(row, guest, [["Editar", openGuest], ["Excluir", openDelete],
-      ["Convite de", (person) => openInviteAdmin([person])]]);
+      ["Gerar convite", (person) => openInviteAdmin([person])]]);
     return row;
   });
   $("guest-rows").replaceChildren(...rows);
@@ -272,7 +272,7 @@ function renderFamilies(active) {
     count.dataset.label = "Convidados vinculados";
     count.textContent = counts.get(family.id) ?? 0;
     addRowActions(row, family, [["Editar grupo", openFamily], ["Excluir grupo", openFamilyDelete],
-      ["Convite de", (group) => openInviteAdmin(active.guests.filter((guest) => guest.familiaId === group.id), group.id)]]);
+      ["Gerar convite familiar", (group) => openInviteAdmin(active.guests.filter((guest) => guest.familiaId === group.id), group.id)]]);
     return row;
   });
   $("family-rows").replaceChildren(...rows);

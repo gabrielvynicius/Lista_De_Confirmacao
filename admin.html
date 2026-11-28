@@ -167,15 +167,20 @@
   <dialog id="invite-dialog" aria-labelledby="invite-title">
     <h2 id="invite-title">Link de confirmação</h2>
     <p id="invite-people"></p>
-    <p>Gerar um novo link substitui o acesso anterior das pessoas acima e preserva as respostas registradas.</p>
     <div id="invite-result" hidden>
+      <p id="invite-access"></p>
+      <label>Código do convite <input id="invite-code" readonly></label>
       <label>Link privado <input id="invite-link" readonly></label>
-      <button id="copy-invite" type="button">Copiar link</button>
+      <div class="actions">
+        <button id="copy-invite" type="button">Copiar link do convite</button>
+        <a class="button-link" id="share-invite" target="_blank" rel="noopener noreferrer">Compartilhar pelo WhatsApp</a>
+      </div>
     </div>
     <p id="invite-message" role="status"></p>
     <div class="actions">
       <button id="invite-close" type="button">Fechar</button>
-      <button class="primary" id="create-invite" type="button">Gerar link</button>
+      <button class="danger" id="revoke-invite" type="button" hidden>Revogar convite</button>
+      <button class="primary" id="create-invite" type="button">Gerar convite</button>
     </div>
   </dialog>
 
